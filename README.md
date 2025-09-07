@@ -1,90 +1,60 @@
-# CMLRE Marine Data Prototype (Flask)
+## Architecture
+This application runs entirely on a local machine. It uses a Flask web server to handle requests from the browser, process images, and serve the frontend. The AI inference is performed locally by loading the model files directly into the backend.
 
-A 3-day SIH-ready backend prototype for a marine data platform.
+(Insert the architecture diagram you created here, but ensure it only shows a local setup)
 
-## 1) Quick Start (Local)
+## How It Works
+The AI recognition process works in two stages:
 
-```bash
-# 1. Create venv
+Signature Creation: An uploaded image is first processed and fed into a core neural network model (model.ckpt). This model acts as a feature extractor, creating a unique mathematical "signature" (an embedding) for the fish in the image.
+
+Signature Matching: This new signature is then compared against a pre-computed library of thousands of known fish signatures (database.pt) using a high-speed search library (Faiss). The closest match in the library is identified as the predicted species.
+
+## Tech Stack
+Backend: Flask
+
+AI Framework: PyTorch
+
+AI Libraries: scikit-learn, Faiss, Timm, Torch-EMA
+
+Frontend: HTML, CSS (Tailwind), JavaScript
+
+## Local Setup & Installation
+Follow these steps to run the application on your local machine.
+
+Clone the Repository
+
+Bash
+
+git clone https://github.com/Ujjawal0711/AquaSense.git
+cd AquaSense
+Download the Model Files
+You must download the model files from the project's GitHub Releases page.
+
+[suspicious link removed]
+
+Unzip the file and place model.ckpt and database.pt in the root project folder.
+
+Create and Activate a Virtual Environment
+
+Bash
+
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+# On Windows:
+# .venv\Scripts\activate
+# On Mac/Linux:
+# source .venv/bin/activate
+Install Dependencies
 
-# 2. Install deps
+Bash
+
 pip install -r requirements.txt
+Run the Application
 
-# 3. Run
+Bash
+
 python app.py
-# Server: http://127.0.0.1:5000/health
-```
+The server will be running at http://127.0.0.1:5000.
 
-## 2) Test Endpoints
-
-### Health
-```
-GET /health
-```
-
-### Upload CSV
-```
-POST /datasets/upload (multipart/form-data)
-  file=@sample_data/ocean_sample.csv
-  dataset_type=oceanography
-  name=Ocean 2024
-```
-
-### Upload JSON
-```
-POST /datasets/upload (multipart/form-data)
-  file=@sample_data/species_sample.json
-  dataset_type=taxonomy
-  name=Species Demo
-```
-
-### List datasets
-```
-GET /datasets
-```
-
-### Preview
-```
-GET /datasets/<id>/preview?limit=5
-```
-
-### Visualize
-```
-GET /datasets/<id>/visualize
-# If columns ocean_temperature & fish_abundance exist -> scatter points returned.
-```
-
-### Species classify (stub)
-```
-POST /classify
-Body: { "species": "Sardine" }
-```
-
-## 3) Cloud-Ready Notes
-
-- Replace SQLite with Postgres by setting `DATABASE_URL` (see `.env.example`). Example:
-  `postgresql+psycopg2://USER:PASSWORD@HOST:5432/DBNAME`
-- For gunicorn (Render/Railway): Start command
-  ```bash
-  gunicorn app:app --bind 0.0.0.0:$PORT
-  ```
-
-## 4) File Tree
-
-```
-sih_cmlre_prototype/
-├─ app.py
-├─ database.py
-├─ models.py
-├─ requirements.txt
-├─ .env.example
-├─ sample_data/
-│  ├─ ocean_sample.csv
-│  └─ species_sample.json
-└─ README.md
-```
-
-## 5) Postman (Optional)
-Import endpoints manually, or use curl examples from above.
+## Acknowledgments
+This project uses pre-trained models and code adapted from the excellent Fishial.ai repository.
