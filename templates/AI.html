@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Analysis - Ocean Research</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0c1121; }
+        .fade-in-up { opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease-out, transform 0.5s ease-out; }
+        .fade-in-up.visible { opacity: 1; transform: translateY(0); }
+        .fade-out.hidden-transition { opacity: 0; pointer-events: none; transition: opacity 0.3s ease-in; }
+        .file-upload-area { transition: background-color 0.3s, border-color 0.3s; }
+        .file-upload-area.drag-over { background-color: rgba(59, 130, 246, 0.1); border-color: #3b82f6; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.2); border-left-color: #ffffff; border-radius: 50%; width: 2rem; height: 2rem; animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body class="text-white font-sans flex flex-col min-h-screen">
+    <!-- ... (The HTML structure is the same, only the script changes) ... -->
+    <header class="bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50"><nav class="container mx-auto px-6 py-4 flex justify-between items-center"><a href="/" class="text-xl font-bold">Ocean Research Platform</a><a href="/" class="text-blue-400 hover:text-blue-300 transition-colors">&larr; Back to Home</a></nav></header>
+    <main class="container mx-auto px-6 py-16 flex-grow"><h1 class="text-4xl font-extrabold mb-4 text-center">AI Analysis Dashboard</h1><p class="text-lg text-gray-400 mb-8 text-center">Upload an image of a fish otolith to classify the species.</p><div class="max-w-4xl mx-auto"><div id="upload-area-container" class="bg-gray-800/50 p-8 rounded-lg border border-gray-700 fade-in-up visible"><div id="upload-area" class="file-upload-area text-center p-10 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700/30"><input type="file" id="file-input" class="hidden" accept="image/*"><svg class="mx-auto h-12 w-12 text-gray-500" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><p class="mt-4 text-gray-400"><span class="font-semibold text-blue-400">Click to upload</span> or drag and drop</p><p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p></div></div><div id="result-section" class="hidden mt-8 fade-in-up"><div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start"><div><h2 class="text-2xl font-bold mb-4">Image Preview</h2><div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700"><img id="image-preview" src="" alt="Image preview" class="rounded-lg shadow-lg w-full object-cover"></div><div class="mt-4 flex flex-col sm:flex-row gap-4"><button id="submit-button" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 text-lg transform hover:scale-105">Submit for Analysis</button><button id="reset-button" class="hidden w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 text-lg">Start New Analysis</button></div></div><div><h2 class="text-2xl font-bold mb-4">Analysis Result</h2><div id="output-content" class="bg-gray-800/50 p-6 rounded-lg border border-gray-700 min-h-[300px] flex items-center justify-center"><p id="placeholder-text" class="text-gray-500">Results will appear here after submission.</p><div id="loading-spinner" class="hidden flex flex-col items-center space-y-3 text-gray-400"><div class="spinner"></div><p>Analyzing Image...</p></div><div id="result-text" class="hidden w-full space-y-3"></div></div></div></div></div></div></main>
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"><div class="bg-gray-800 rounded-lg shadow-xl p-6 max-w-sm w-full text-center border border-gray-700"><p id="alert-message" class="text-lg text-gray-200 mb-4"></p><button id="alert-close-button" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition-colors">OK</button></div></div>
+    <footer class="text-center py-8 mt-auto border-t border-gray-800"><p class="text-gray-500">&copy; 2025 Ocean Research Platform. All rights reserved.</p></footer>
+
+    <script>
+        // --- (Element getters are the same) ---
+        const uploadAreaContainer = document.getElementById('upload-area-container'); const uploadArea = document.getElementById('upload-area'); const fileInput = document.getElementById('file-input'); const resultSection = document.getElementById('result-section'); const imagePreview = document.getElementById('image-preview'); const submitButton = document.getElementById('submit-button'); const resetButton = document.getElementById('reset-button'); const placeholderText = document.getElementById('placeholder-text'); const loadingSpinner = document.getElementById('loading-spinner'); const resultText = document.getElementById('result-text'); const alertModal = document.getElementById('alert-modal'); const alertMessage = document.getElementById('alert-message'); const alertCloseButton = document.getElementById('alert-close-button');
+        let imageData = { base64: null, mimeType: null };
+        uploadArea.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (event) => { if (event.target.files[0]) handleFile(event.target.files[0]); }); submitButton.addEventListener('click', startAnalysis); resetButton.addEventListener('click', resetAnalysis); alertCloseButton.addEventListener('click', () => alertModal.classList.add('hidden'));
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { uploadArea.addEventListener(eventName, preventDefaults, false); document.body.addEventListener(eventName, preventDefaults, false); }); ['dragenter', 'dragover'].forEach(eventName => uploadArea.addEventListener(eventName, () => uploadArea.classList.add('drag-over'), false)); ['dragleave', 'drop'].forEach(eventName => uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('drag-over'), false)); uploadArea.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }, false);
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        function handleFile(file) { if (!file.type.startsWith('image/')) { showModal('Please upload an image file.'); return; } uploadAreaContainer.classList.add('hidden-transition'); setTimeout(() => uploadAreaContainer.classList.add('hidden'), 300); resultSection.classList.remove('hidden'); setTimeout(() => resultSection.classList.add('visible'), 50); resetResultState(); const reader = new FileReader(); reader.onload = (e) => { imagePreview.src = e.target.result; imageData.base64 = e.target.result.split(',')[1]; imageData.mimeType = file.type; }; reader.readAsDataURL(file); }
+
+        async function startAnalysis() {
+            if (!imageData.base64) { showModal('No image data available to analyze.'); return; }
+            placeholderText.classList.add('hidden'); loadingSpinner.classList.remove('hidden'); resultText.classList.add('hidden'); submitButton.disabled = true; submitButton.textContent = 'Analyzing...';
+
+            try {
+                const response = await fetch('/analyse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mimeType: imageData.mimeType, data: imageData.base64 })
+                });
+
+                // This block is updated to show more detail
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Display the detailed error from the server if it exists
+                    const detailedMessage = errorData.details ? `${errorData.error}\n\nDetails: ${errorData.details}` : errorData.error;
+                    throw new Error(detailedMessage || `Request failed with status ${response.status}`);
+                }
+
+                const result = await response.json();
+                const analysisText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!analysisText) throw new Error('Invalid response structure from the AI model.');
+
+                loadingSpinner.classList.add('hidden');
+                resultText.classList.remove('hidden');
+                resultText.innerHTML = analysisText.replace(/\n/g, '<br>');
+
+            } catch (error) {
+                console.error('AI Analysis Error:', error);
+                showModal(`Analysis failed: ${error.message}`);
+                loadingSpinner.classList.add('hidden');
+                placeholderText.classList.remove('hidden');
+                placeholderText.textContent = 'An error occurred during analysis.';
+            } finally {
+                submitButton.classList.add('hidden');
+                resetButton.classList.remove('hidden');
+            }
+        }
+
+        function resetAnalysis() { uploadAreaContainer.classList.remove('hidden'); setTimeout(() => uploadAreaContainer.classList.remove('hidden-transition'), 50); resultSection.classList.remove('visible'); setTimeout(() => resultSection.classList.add('hidden'), 500); fileInput.value = ''; imageData = { base64: null, mimeType: null }; }
+        function resetResultState() { placeholderText.classList.remove('hidden'); loadingSpinner.classList.add('hidden'); resultText.classList.add('hidden'); resultText.innerHTML = ''; submitButton.disabled = false; submitButton.textContent = 'Submit for Analysis'; submitButton.classList.remove('hidden'); resetButton.classList.add('hidden'); }
+        function showModal(message) { alertMessage.textContent = message; alertModal.classList.remove('hidden'); }
+    </script>
+</body>
+</html>
+

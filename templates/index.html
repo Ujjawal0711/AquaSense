@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMLRE - Oceanographic Research</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #010413; /* Corrected to a much darker blue/black */
+            color: #E0E0E0;
+        }
+
+        .gradient-text {
+            /* Adjusted gradient to match the brighter blues in the video */
+            background: linear-gradient(90deg, #38BDF8, #3B82F6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #3B82F6, #2563EB);
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.6); /* Enhanced glow effect on hover */
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: rgba(59, 130, 246, 0.1); /* Changed to a subtle blue background */
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .glass-card {
+            /* Darker glass effect with a blue tint to match the video */
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.2); /* Subtle blue border */
+        }
+
+        /* Animation for elements fading in on scroll */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header Section -->
+    <header id="header" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-opacity-80 backdrop-blur-lg border-b border-gray-800">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <!-- Logo -->
+            <a href="#" class="flex items-center space-x-2">
+                <svg class="h-8 w-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                </svg>
+                <span class="text-xl font-bold text-white">CMLRE</span>
+            </a>
+
+            <!-- Desktop Navigation -->
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#" class="text-gray-300 hover:text-white transition">Home</a>
+                <a href="#features" class="text-gray-300 hover:text-white transition">Features</a>
+                <a href="#platform" class="text-gray-300 hover:text-white transition">Platform</a>
+                <a href="#contact" class="text-gray-300 hover:text-white transition">Contact</a>
+            </div>
+
+            <!-- Get Started Button -->
+            <div class="hidden md:block">
+                 <a href="#" class="btn-primary text-white font-semibold px-5 py-2 rounded-lg">Get Started</a>
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button id="mobile-menu-button" class="md:hidden text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+            </button>
+        </nav>
+
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden px-6 pb-4">
+            <a href="#" class="block py-2 text-gray-300 hover:text-white">Home</a>
+            <a href="#features" class="block py-2 text-gray-300 hover:text-white">Features</a>
+            <a href="#platform" class="block py-2 text-gray-300 hover:text-white">Platform</a>
+            <a href="#contact" class="block py-2 text-gray-300 hover:text-white">Contact</a>
+            <a href="#" class="block mt-4 btn-primary text-white text-center font-semibold px-5 py-2 rounded-lg">Get Started</a>
+        </div>
+    </header>
+
+    <main>
+    <section class="relative pt-48 pb-32 text-center overflow-hidden">
+         <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-blue-500/20 blur-3xl rounded-full -z-10"></div>
+
+        <div class="container mx-auto px-6">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-white leading-tight fade-in">
+                Collaborate with researchers worldwide, and <span class="gradient-text">protect our oceans.</span>
+            </h1>
+            <p class="mt-6 max-w-3xl mx-auto text-lg text-gray-400 fade-in" style="transition-delay: 100ms;">
+                An AI-driven platform revolutionizing marine research with comprehensive data analysis, fisheries management, and biodiversity insights.
+            </p>
+            <div class="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4 fade-in" style="transition-delay: 200ms;">
+
+                <!-- Analyse with AI Button -->
+                <button onclick="window.location.href='/ai'"
+             class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-300">
+              Analyse with AI
+                </button>
+
+                    <!-- Library Button -->
+                <button onclick="window.location.href='/library'"
+                        class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg border border-gray-600 transition-colors duration-300">
+                    Library
+                    </button>
+
+                </div>
+        </div>
+    </section>
+</main>
+                </div>
+
+                <div class="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-4xl mx-auto fade-in" style="transition-delay: 300ms;">
+                    <div class="text-center">
+                        <h3 class="text-4xl font-bold text-white">24/7</h3>
+                        <p class="text-gray-400">Expert Support</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-4xl font-bold text-white">99.9%</h3>
+                        <p class="text-gray-400">Platform Uptime</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-4xl font-bold text-white">ISO</h3>
+                        <p class="text-gray-400">Security Certified</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Platform Features Section -->
+        <section id="features" class="py-20">
+            <div class="container mx-auto px-6">
+                <div class="text-center max-w-3xl mx-auto fade-in">
+                    <h2 class="text-4xl font-bold text-white">Powerful tools designed to revolutionize marine research and biodiversity analysis.</h2>
+                </div>
+
+                <div class="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <!-- Feature Card 1 -->
+                    <div class="glass-card p-8 rounded-xl text-center fade-in">
+                        <div class="bg-blue-500/10 inline-flex p-4 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10m16-10v10M4 11h16M4 17h16M4 4h16M4 20h16"/></svg>
+                        </div>
+                        <h3 class="mt-4 text-xl font-semibold text-white">Automated Data Ingestion</h3>
+                        <p class="mt-2 text-gray-400 text-sm">Seamlessly ingest vast datasets from multiple sources with intelligent metadata tagging.</p>
+                    </div>
+                    <!-- Feature Card 2 -->
+                    <div class="glass-card p-8 rounded-xl text-center fade-in" style="transition-delay: 100ms;">
+                        <div class="bg-blue-500/10 inline-flex p-4 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <h3 class="mt-4 text-xl font-semibold text-white">Cross-Disciplinary Correlation</h3>
+                        <p class="mt-2 text-gray-400 text-sm">Discover hidden patterns and relationships across oceanographic and fisheries data.</p>
+                    </div>
+                    <!-- Feature Card 3 -->
+                    <div class="glass-card p-8 rounded-xl text-center fade-in" style="transition-delay: 200ms;">
+                        <div class="bg-blue-500/10 inline-flex p-4 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        </div>
+                        <h3 class="mt-4 text-xl font-semibold text-white">Interactive Visualizations</h3>
+                        <p class="mt-2 text-gray-400 text-sm">Explore data through dynamic modules including otolith shape analysis and morphometrics.</p>
+                    </div>
+                    <!-- Feature Card 4 -->
+                    <div class="glass-card p-8 rounded-xl text-center fade-in" style="transition-delay: 300ms;">
+                        <div class="bg-blue-500/10 inline-flex p-4 rounded-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                        </div>
+                        <h3 class="mt-4 text-xl font-semibold text-white">Molecular & eDNA Storage</h3>
+                        <p class="mt-2 text-gray-400 text-sm">Comprehensive storage and retrieval system for molecular data with AI-powered analysis.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Platform Section -->
+        <section id="platform" class="py-20">
+            <div class="container mx-auto px-6 text-center">
+                <h2 class="text-4xl md:text-5xl font-extrabold text-white leading-tight fade-in">
+                    AI-Driven Unified Data Platform
+                </h2>
+                <p class="mt-4 text-lg text-blue-300 font-semibold fade-in" style="transition-delay: 100ms;">for Oceanographic, Fisheries, and Molecular Biodiversity Insights</p>
+                <p class="mt-6 max-w-3xl mx-auto text-gray-400 fade-in" style="transition-delay: 200ms;">
+                    Harness the power of artificial intelligence to unlock unprecedented insights from marine ecosystems. Our unified platform seamlessly integrates oceanographic data, fisheries analytics, and molecular biodiversity research.
+                </p>
+                <div class="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4 fade-in" style="transition-delay: 300ms;">
+                    <a href="#" class="w-full sm:w-auto btn-primary text-white font-semibold px-8 py-3 rounded-lg flex items-center justify-center gap-2">
+                        Explore Platform
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                    </a>
+                    <a href="#" class="w-full sm:w-auto btn-secondary text-white font-semibold px-8 py-3 rounded-lg flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Watch Demo
+                    </a>
+                </div>
+
+                <div class="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-4xl mx-auto fade-in" style="transition-delay: 400ms;">
+                    <div class="text-center">
+                        <h3 class="text-4xl font-bold gradient-text">10M+</h3>
+                        <p class="text-gray-400">Data Points Analyzed</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-4xl font-bold gradient-text">500+</h3>
+                        <p class="text-gray-400">Species Catalogued</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-4xl font-bold gradient-text">95%</h3>
+                        <p class="text-gray-400">Accuracy Rate</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Visualization Section -->
+        <section class="py-20">
+            <div class="container mx-auto px-6">
+                <div class="text-center max-w-3xl mx-auto fade-in">
+                    <h2 class="text-4xl font-bold text-white">Data Visualization Dashboard</h2>
+                     <p class="mt-4 text-gray-400">Comprehensive visual analytics for marine research and biodiversity monitoring.</p>
+                </div>
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center fade-in" style="transition-delay: 200ms;">
+                    <img src="https://placehold.co/600x400/171E36/FFFFFF?text=Ocean+Salinity+Trends" alt="Line Chart" class="rounded-lg shadow-lg w-full">
+                    <img src="https://placehold.co/600x400/171E36/FFFFFF?text=Species+Distribution" alt="Pie Chart" class="rounded-lg shadow-lg w-full">
+                </div>
+            </div>
+        </section>
+
+        <!-- Call To Action Section -->
+        <section class="py-20">
+            <div class="container mx-auto px-6 text-center">
+                <div class="glass-card rounded-2xl p-10 md:p-16 max-w-4xl mx-auto fade-in">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white">Join Us in Advancing Oceanographic Research</h2>
+                    <p class="mt-4 text-gray-400 max-w-2xl mx-auto">Be part of the next generation of marine scientists. Access cutting-edge tools, collaborate with researchers worldwide, and contribute to protecting our oceans.</p>
+                    <div class="mt-8">
+                        <a href="#" class="btn-primary text-white font-semibold px-8 py-4 rounded-lg text-lg">
+                            Get Started
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer Section -->
+    <footer id="contact" class="bg-gray-900/40 border-t border-gray-800 pt-16 pb-8">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <!-- About -->
+                <div class="col-span-1 md:col-span-2">
+                     <a href="#" class="flex items-center space-x-2">
+                        <svg class="h-8 w-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                        </svg>
+                        <span class="text-xl font-bold text-white">CMLRE</span>
+                    </a>
+                    <p class="mt-4 text-gray-400 max-w-md">Centre for Marine Living Resources & Ecology. Advancing ocean science through AI-driven data platforms.</p>
+                </div>
+
+                <!-- Quick Links -->
+                <div>
+                    <h4 class="text-white font-semibold">Quick Links</h4>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">About CMLRE</a></li>
+                        <li><a href="#features" class="text-gray-400 hover:text-white transition">Platform Features</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">Research Insights</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">Documentation</a></li>
+                    </ul>
+                </div>
+
+                <!-- Resources -->
+                <div>
+                    <h4 class="text-white font-semibold">Resources</h4>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">API Documentation</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">User Guide</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">Tutorials</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition">Case Studies</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-12 border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-500 text-sm">© 2025 CMLRE. All rights reserved.</p>
+                 <div class="flex space-x-4 mt-4 md:mt-0">
+                    <a href="#" class="text-gray-500 hover:text-white"><svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.71v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" /></svg></a>
+                    <a href="#" class="text-gray-500 hover:text-white"><svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clip-rule="evenodd" /></svg></a>
+                    <a href="#" class="text-gray-500 hover:text-white"><svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12.019c0 4.434 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.009-.868-.014-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.031-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.338 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.001 10.001 0 0022 12.019C22 6.477 17.523 2 12 2z" clip-rule="evenodd" /></svg></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Mobile Menu Toggle
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+
+            // Sticky Header on Scroll
+            const header = document.getElementById('header');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 50) {
+                    header.classList.add('bg-gray-900/80');
+                } else {
+                    header.classList.remove('bg-gray-900/80');
+                }
+            });
+
+            // Intersection Observer for fade-in animations
+            const faders = document.querySelectorAll('.fade-in');
+            const appearOptions = {
+                threshold: 0.2, // Trigger when 20% of the element is visible
+                rootMargin: "0px 0px -50px 0px" // Start animating a bit before it's fully in view
+            };
+
+            const appearOnScroll = new IntersectionObserver(function(entries, appearOnScroll) {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) {
+                        return;
+                    } else {
+                        entry.target.classList.add('visible');
+                        appearOnScroll.unobserve(entry.target);
+                    }
+                });
+            }, appearOptions);
+
+            faders.forEach(fader => {
+                appearOnScroll.observe(fader);
+            });
+        });
+    </script>
+</body>
+</html>
+

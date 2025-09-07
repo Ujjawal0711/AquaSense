@@ -1,0 +1,16 @@
+flask
+torch
+torchvision
+numpy
+Pillow
+tqdm
+scipy
+scikit-learn
+faiss-cpu
+torch-ema
+joblib
+pyclipper
+shapely
+albumentations
+opencv-python-headless
+timm

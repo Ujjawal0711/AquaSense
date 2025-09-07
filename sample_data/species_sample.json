@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "species": "sardine",
+      "length_cm": 18,
+      "region": "Arabian Sea"
+    },
+    {
+      "species": "mackerel",
+      "length_cm": 28,
+      "region": "Bay of Bengal"
+    },
+    {
+      "species": "anchovy",
+      "length_cm": 10,
+      "region": "Laccadive Sea"
+    }
+  ]
+}

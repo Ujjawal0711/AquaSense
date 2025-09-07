@@ -1,0 +1,114 @@
+{
+  "info": {
+    "name": "CMLRE Prototype API",
+    "_postman_id": "cmlre-proto-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/health",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "List Datasets",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/datasets",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "datasets"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Preview Dataset",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/datasets/1/preview?limit=5",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "datasets",
+            "1",
+            "preview"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Visualize Dataset",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base}}/datasets/1/visualize",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "datasets",
+            "1",
+            "visualize"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Classify (stub)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"species\": \"Sardine\"\n}"
+        },
+        "url": {
+          "raw": "{{base}}/classify",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "classify"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://127.0.0.1:5000"
+    }
+  ]
+}
