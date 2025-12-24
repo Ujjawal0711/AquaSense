@@ -1,4 +1,4 @@
-## Architecture
+## Architecture!
 This application runs entirely on a local machine. It uses a Flask web server to handle requests from the browser, process images, and serve the frontend. The AI inference is performed locally by loading the model files directly into the backend.
 
 (Insert the architecture diagram you created here, but ensure it only shows a local setup)
