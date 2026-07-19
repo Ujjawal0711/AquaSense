@@ -52,7 +52,7 @@
                 }
 
                 const result = await response.json();
-                const analysisText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                const analysisText = result.html;
                 if (!analysisText) throw new Error('Invalid response structure from the AI model.');
 
                 loadingSpinner.classList.add('hidden');

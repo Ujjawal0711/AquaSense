@@ -75,7 +75,10 @@ class EmbeddingClassifier:
 
     def _load_model(self, checkpoint_path: str):
         state_dict = torch.load(checkpoint_path, map_location=self.device)
-        self.model = StableEmbeddingModel(embedding_dim=256, num_classes=639, pretrained=True, freeze_backbone=True)
+        # pretrained=False: the trained checkpoint loaded just below supplies all
+        # backbone weights, so fetching ImageNet weights here only wastes a
+        # network round-trip on every startup (and fails offline).
+        self.model = StableEmbeddingModel(embedding_dim=256, num_classes=639, pretrained=False, freeze_backbone=True)
         self.model.load_state_dict(state_dict['model_state_dict'])
         self.model.to(self.device)
         self.model.eval()

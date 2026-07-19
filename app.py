@@ -25,8 +25,16 @@ config = {
 
 print("Loading local AI model... This may take a moment.")
 # This creates a single instance of the classifier, loading the model into memory
-classifier = EmbeddingClassifier(config)
-print("Local AI Model loaded successfully.")
+try:
+    classifier = EmbeddingClassifier(config)
+    print("Local AI Model loaded successfully.")
+except FileNotFoundError as e:
+    raise SystemExit(
+        f"\n[AquaSense] Could not load model files: {e}\n"
+        "This app needs the trained weights `model.ckpt` and the embedding "
+        "database `database.pt` in the project root. They are NOT distributed "
+        "with the repository (see README for how to obtain/train them).\n"
+    )
 
 
 # --- WEB ROUTES ---
@@ -47,7 +55,7 @@ def index():
 
 @app.route('/analyse', methods=['POST'])
 def analyse():
-    req_data = request.get_json()
+    req_data = request.get_json(silent=True) or {}
     base64_data = req_data.get('data')
 
     if not base64_data:
@@ -61,25 +69,26 @@ def analyse():
         # Convert the image to a NumPy array for the classifier
         image_np = np.array(image)
 
-        # Call the classifier with the image to get prediction results
-        prediction_results = classifier(image_np)
+        # The classifier returns the candidate matches for the single fish
+        candidates = classifier(image_np)
+        if not candidates:
+            return jsonify({"html":
+                "<h3>No confident match</h3>"
+                "<p>This image did not match any known species above the similarity "
+                "threshold. Try a clearer otolith image.</p>"})
 
-        # Get the top prediction from the results list
-        top_prediction = prediction_results[0]
-        predicted_name = top_prediction.name
+        # Rank by confidence (highest first) rather than dict insertion order,
+        # and surface the top-5 matches instead of only the single best.
+        ranked = sorted(candidates, key=lambda r: r.accuracy, reverse=True)
+        top = ranked[0]
+        rows = "".join(f"<li>{r.name} &mdash; {r.accuracy:.2f}</li>" for r in ranked[:5])
 
-        # Create the HTML response string your frontend expects
         response_html = (
-            f"<h3>Analysis Complete</h3>"
-            f"<p><strong>Predicted Species:</strong> {predicted_name}</p>"
-            f"<p><strong>Confidence Score:</strong> {top_prediction.accuracy:.2f}</p>"
+            f"<h3>Predicted Species: {top.name}</h3>"
+            f"<p><strong>Confidence:</strong> {top.accuracy:.2f}</p>"
+            f"<p><strong>Top matches:</strong></p><ol>{rows}</ol>"
         )
-
-        # Build the final JSON response
-        response_data = {
-            "candidates": [{"content": {"parts": [{"text": response_html}]}}]
-        }
-        return jsonify(response_data)
+        return jsonify({"html": response_html})
 
     except Exception as e:
         print(f"An error occurred: {e}")  # This will show the error in your terminal
@@ -87,4 +96,6 @@ def analyse():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    # debug=False: never ship the interactive debugger / auto-reloader on a
+    # publicly reachable host (0.0.0.0). Flip to True only for local dev.
+    app.run(debug=False, host='0.0.0.0', port=5000)
