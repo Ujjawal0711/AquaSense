@@ -1,16 +1,11 @@
-flask
-torch
-torchvision
+# Runtime: app.py + inference.py
+flask>=3.0
+torch>=2.1
+torchvision>=0.16
 numpy
-Pillow
-tqdm
-scipy
-scikit-learn
-faiss-cpu
+Pillow>=9.1
 torch-ema
-joblib
-pyclipper
-shapely
-albumentations
-opencv-python-headless
-timm
+
+# Optional
+# timm          # ViT variant in model_v2.py
+# sqlalchemy>=2 # CMLRE otolith data layer (database.py, models.py)

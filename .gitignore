@@ -1,2 +1,15 @@
+# Model weights / embedding database (large, not distributed)
 *.pt
 *.ckpt
+*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local data / IDE
+db.sqlite3
+.idea/
+.env

@@ -15,15 +15,15 @@ Recognition happens in two stages:
    (a "signature") for the fish.
 2. **Signature matching** — that embedding is compared against a precomputed library
    of known fish signatures (`database.pt`). Candidate classes are first narrowed by
-   cosine similarity to per-class **centroids** (top-5), then refined with a
-   **Faiss** inner-product search over the members of those classes (top-10). The
-   best-scoring species is returned, along with the next-best matches.
+   cosine similarity to per-class **centroids** (top-5), then refined with an exact
+   inner-product search over the members of those classes (top-10). The top-5
+   species are returned, ranked by similarity.
 
 ## Tech Stack
 
 - **Backend:** Flask
 - **AI framework:** PyTorch / torchvision (ConvNeXt-Tiny)
-- **AI libraries:** Faiss (nearest-neighbour search), scikit-learn, torch-ema
+- **AI libraries:** NumPy (vectorised nearest-neighbour search), torch-ema
 - **Frontend:** HTML, Tailwind CSS, vanilla JavaScript
 
 ## Model Files (important)
@@ -38,10 +38,15 @@ To run inference you need to supply them yourself, either by:
   the embedding architecture is defined in `inference.py` / `model_v2.py`), and then
   precomputing `database.pt` from your labelled image set, or
 - obtaining a compatible checkpoint whose `state_dict` matches `StableEmbeddingModel`
-  (`embedding_dim=256`, `num_classes=639`).
+  **in `inference.py`** (`embedding_dim=256`, `num_classes=639`). Note that
+  `model_v2.py`'s `StableEmbeddingModel` uses different layer names and is *not*
+  checkpoint-compatible with the inference pipeline.
 
-Without these files the web server still starts and serves the UI, but `/analyse` cannot
-classify images.
+Without these files the web server still starts and serves the UI; `/analyse` returns
+`503` with an explanation, and `GET /health` reports `model_loaded: false`.
+
+Paths can be overridden with `AQUASENSE_MODEL`, `AQUASENSE_DATABASE` and
+`AQUASENSE_DEVICE` (e.g. `cuda`).
 
 ## Local Setup
 
@@ -60,13 +65,14 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The server runs at `http://127.0.0.1:5000`.
+The server runs at `http://127.0.0.1:5000`. Set `AQUASENSE_HOST=0.0.0.0` to expose it
+on your network and `PORT` to change the port.
 
 ## Project Layout
 
 | File | Purpose |
 |---|---|
-| `app.py` | Flask server, routes, and the `/analyse` inference endpoint |
+| `app.py` | Flask server, routes, `/analyse` inference endpoint, `/health` |
 | `inference.py` | `EmbeddingClassifier` + the `StableEmbeddingModel` architecture |
 | `model_v2.py` | Model / training-side definitions |
 | `database.py`, `models.py` | SQLAlchemy data layer for CMLRE otolith records |
