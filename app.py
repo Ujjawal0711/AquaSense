@@ -1,101 +1,143 @@
-import io
 import base64
-from flask import Flask, request, jsonify, render_template
-from PIL import Image
-import numpy as np
+import binascii
+import io
+import logging
+import os
+from html import escape
 
-# Import the main class from your inference.py script
-from inference import EmbeddingClassifier
+from flask import Flask, jsonify, render_template, request
+from PIL import Image, ImageOps
+
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] - %(message)s")
+log = logging.getLogger("AquaSense")
 
 app = Flask(__name__)
+# The UI allows 10 MB images; base64 inflates that by ~4/3, plus JSON overhead.
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-# --- CONFIGURATION & MODEL LOADING ---
-
-# This dictionary points to your local model files
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 config = {
     "model": {
-        "path": "model.ckpt",
-        "device": "cpu"
+        "path": os.getenv("AQUASENSE_MODEL", os.path.join(BASE_DIR, "model.ckpt")),
+        "device": os.getenv("AQUASENSE_DEVICE", "cpu"),
     },
     "dataset": {
-        "path": "database.pt"
+        "path": os.getenv("AQUASENSE_DATABASE", os.path.join(BASE_DIR, "database.pt")),
     },
-    "log_level": "INFO"
+    "log_level": "INFO",
 }
 
-print("Loading local AI model... This may take a moment.")
-# This creates a single instance of the classifier, loading the model into memory
-try:
-    classifier = EmbeddingClassifier(config)
-    print("Local AI Model loaded successfully.")
-except FileNotFoundError as e:
-    raise SystemExit(
-        f"\n[AquaSense] Could not load model files: {e}\n"
-        "This app needs the trained weights `model.ckpt` and the embedding "
-        "database `database.pt` in the project root. They are NOT distributed "
-        "with the repository (see README for how to obtain/train them).\n"
-    )
+TOP_K = 5
+
+
+def _load_classifier():
+    """Load the model once at startup. If the weights or ML dependencies are
+    missing the UI still serves and /analyse answers 503 instead of crashing."""
+    missing = [p for p in (config["model"]["path"], config["dataset"]["path"]) if not os.path.isfile(p)]
+    if missing:
+        return None, (
+            "Model files not found: " + ", ".join(os.path.basename(p) for p in missing)
+            + ". Place model.ckpt and database.pt in the project root (see README)."
+        )
+    try:
+        from inference import EmbeddingClassifier  # heavy import (torch); only when needed
+        log.info("Loading local AI model... This may take a moment.")
+        clf = EmbeddingClassifier(config)
+        log.info("Local AI model loaded successfully.")
+        return clf, None
+    except Exception as e:  # bad checkpoint, missing torch, etc.
+        log.exception("Failed to load the AI model")
+        return None, f"Failed to load the AI model: {e}"
+
+
+classifier, classifier_error = _load_classifier()
+if classifier_error:
+    log.warning("[AquaSense] %s The web UI will run, but /analyse is disabled.", classifier_error)
 
 
 # --- WEB ROUTES ---
-# Add this new route to your app.py
-@app.route('/library')
-def library():
-    return render_template('library.html')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 
 @app.route('/ai')
 def ai_page():
     return render_template('AI.html')
 
-@app.route('/')
-def index():
 
-    return render_template('index.html')
+@app.route('/library')
+def library():
+    # File is Library.html; lowercase name 404s on case-sensitive filesystems.
+    return render_template('Library.html')
+
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok", "model_loaded": classifier is not None, "error": classifier_error})
+
+
+def _decode_image(b64: str) -> Image.Image:
+    # Accept both raw base64 and full data URLs ("data:image/png;base64,....").
+    if b64.startswith("data:") and "," in b64:
+        b64 = b64.split(",", 1)[1]
+    image_bytes = base64.b64decode(b64, validate=True)
+    image = Image.open(io.BytesIO(image_bytes))
+    # Phone photos store rotation in EXIF; without this the model sees them sideways.
+    image = ImageOps.exif_transpose(image)
+    return image.convert("RGB")
 
 
 @app.route('/analyse', methods=['POST'])
 def analyse():
+    if classifier is None:
+        return jsonify({'error': 'AI model is not available.', 'details': classifier_error}), 503
+
     req_data = request.get_json(silent=True) or {}
     base64_data = req_data.get('data')
-
-    if not base64_data:
+    if not base64_data or not isinstance(base64_data, str):
         return jsonify({'error': 'No image data provided'}), 400
 
     try:
-        # Decode the base64 string into image bytes
-        image_bytes = base64.b64decode(base64_data)
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        image = _decode_image(base64_data)
+    except (binascii.Error, ValueError, OSError, Image.DecompressionBombError) as e:  # OSError covers truncated/unreadable files
+        return jsonify({'error': 'Invalid image.', 'details': str(e)}), 400
 
-        # Convert the image to a NumPy array for the classifier
-        image_np = np.array(image)
+    try:
+        candidates = classifier(image)
+    except Exception:
+        log.exception("Inference failed")
+        return jsonify({'error': 'Failed to process image.'}), 500
 
-        # The classifier returns the candidate matches for the single fish
-        candidates = classifier(image_np)
-        if not candidates:
-            return jsonify({"html":
-                "<h3>No confident match</h3>"
-                "<p>This image did not match any known species above the similarity "
-                "threshold. Try a clearer otolith image.</p>"})
+    if not candidates:
+        return jsonify({"html":
+            "<h3>No confident match</h3>"
+            "<p>This image did not match any known species above the similarity "
+            "threshold. Try a clearer, well-lit photo of a single fish.</p>"})
 
-        # Rank by confidence (highest first) rather than dict insertion order,
-        # and surface the top-5 matches instead of only the single best.
-        ranked = sorted(candidates, key=lambda r: r.accuracy, reverse=True)
-        top = ranked[0]
-        rows = "".join(f"<li>{r.name} &mdash; {r.accuracy:.2f}</li>" for r in ranked[:5])
+    ranked = sorted(candidates, key=lambda r: r.accuracy, reverse=True)[:TOP_K]
+    top = ranked[0]
+    # Species names come from the model database; escape before embedding in HTML.
+    rows = "".join(f"<li>{escape(r.name)} &mdash; {r.accuracy:.2f}</li>" for r in ranked)
+    response_html = (
+        f"<h3>Predicted Species: {escape(top.name)}</h3>"
+        f"<p><strong>Confidence:</strong> {top.accuracy:.2f}</p>"
+        f"<p><strong>Top matches:</strong></p><ol>{rows}</ol>"
+    )
+    return jsonify({
+        "html": response_html,
+        "predictions": [{"name": r.name, "species_id": int(r.species_id), "confidence": round(r.accuracy, 4)}
+                        for r in ranked],
+    })
 
-        response_html = (
-            f"<h3>Predicted Species: {top.name}</h3>"
-            f"<p><strong>Confidence:</strong> {top.accuracy:.2f}</p>"
-            f"<p><strong>Top matches:</strong></p><ol>{rows}</ol>"
-        )
-        return jsonify({"html": response_html})
 
-    except Exception as e:
-        print(f"An error occurred: {e}")  # This will show the error in your terminal
-        return jsonify({'error': 'Failed to process image.', 'details': str(e)}), 500
+@app.errorhandler(413)
+def too_large(_e):
+    return jsonify({'error': 'Image too large. Maximum upload is 10 MB.'}), 413
 
 
 if __name__ == '__main__':
-    # debug=False: never ship the interactive debugger / auto-reloader on a
-    # publicly reachable host (0.0.0.0). Flip to True only for local dev.
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    # Default to localhost; set AQUASENSE_HOST=0.0.0.0 to expose on the network.
+    # Never enable debug on a reachable host (the Werkzeug debugger allows code execution).
+    app.run(debug=False, host=os.getenv("AQUASENSE_HOST", "127.0.0.1"), port=int(os.getenv("PORT", "5000")))

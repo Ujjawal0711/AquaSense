@@ -1,33 +1,30 @@
 import logging
+import pickle
 import time
-from collections import defaultdict, Counter
-from contextlib import contextmanager
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Union
 
-import faiss
-import joblib
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import convnext_tiny
-
 from PIL import Image
-from scipy.stats import entropy
-from sklearn.metrics import pairwise_distances
 from torch_ema import ExponentialMovingAverage
 from torchvision import transforms
+from torchvision.models import ConvNeXt_Tiny_Weights, convnext_tiny
+from torchvision.transforms import InterpolationMode
 
-# Setup Logger
 logger = logging.getLogger("EmbeddingClassifier")
 if not logger.handlers:
     handler = logging.StreamHandler()
-    formatter = logging.Formatter(
+    handler.setFormatter(logging.Formatter(
         "[%(asctime)s] [%(levelname)s] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    handler.setFormatter(formatter)
+    ))
     logger.addHandler(handler)
+
+ImageInput = Union[np.ndarray, Image.Image]
+
 
 @dataclass
 class PredictionResult:
@@ -35,141 +32,147 @@ class PredictionResult:
     species_id: int
     distance: float
     accuracy: float
-    image_id: int
-    annotation_id: int
-    drawn_fish_id: int
+    image_id: Optional[int]
+    annotation_id: Optional[int]
+    drawn_fish_id: Optional[int]
 
-@contextmanager
-def use_ema_params(model, ema):
-    original_params = [param.detach().clone() for param in model.parameters()]
+
+def _torch_load(path: str, map_location):
+    """Load with weights_only=True (safe, default since torch 2.6); fall back for
+    older local files that pickle non-tensor objects."""
     try:
-        ema.copy_to(model.parameters())
-        yield
-    finally:
-        for param, orig in zip(model.parameters(), original_params):
-            param.data.copy_(orig)
+        return torch.load(path, map_location=map_location, weights_only=True)
+    except pickle.UnpicklingError:
+        logger.warning(f"{path} needs full unpickling; only load files you trust.")
+        return torch.load(path, map_location=map_location, weights_only=False)
+
 
 class EmbeddingClassifier:
     def __init__(self, config: Dict):
         logger.setLevel(getattr(logging, config.get('log_level', 'INFO').upper()))
-        self._load_data(config["dataset"]["path"])
+        logger.info("Initializing EmbeddingClassifier...")
 
+        self._load_data(config["dataset"]["path"])
         self.dim = self.db_embeddings.shape[1]
         self._prepare_centroids()
-
-        logger.info("Initializing EmbeddingClassifier...")
 
         self.device = config["model"].get("device", "cpu")
         self._load_model(config["model"]["path"])
 
         self.transform = transforms.Compose([
-            transforms.Resize((224, 224), Image.BILINEAR),
+            transforms.Resize((224, 224), InterpolationMode.BILINEAR),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-        # Create ID to label mapping
-        self.id_to_label = {internal_id: self.keys[internal_id]['label'] for internal_id in self.keys}
-
+        self.id_to_label = {internal_id: v['label'] for internal_id, v in self.keys.items()}
         logger.info("EmbeddingClassifier initialized successfully.")
 
     def _load_model(self, checkpoint_path: str):
-        state_dict = torch.load(checkpoint_path, map_location=self.device)
-        # pretrained=False: the trained checkpoint loaded just below supplies all
-        # backbone weights, so fetching ImageNet weights here only wastes a
-        # network round-trip on every startup (and fails offline).
+        state_dict = _torch_load(checkpoint_path, map_location=self.device)
+        # pretrained=False: the checkpoint supplies every weight.
         self.model = StableEmbeddingModel(embedding_dim=256, num_classes=639, pretrained=False, freeze_backbone=True)
         self.model.load_state_dict(state_dict['model_state_dict'])
         self.model.to(self.device)
         self.model.eval()
 
-        self.ema = ExponentialMovingAverage(self.model.parameters(), decay=0.995)
-        self.ema.load_state_dict(state_dict['ema_state_dict'])
+        # Inference never trains, so bake the EMA weights in once. Swapping them in
+        # and out per request cloned every parameter each call and was not
+        # thread-safe under Flask's threaded server.
+        ema = ExponentialMovingAverage(self.model.parameters(), decay=0.995)
+        ema.load_state_dict(state_dict['ema_state_dict'])
+        ema.copy_to(self.model.parameters())
 
         logger.info(f"Torch model loaded from {checkpoint_path}")
         return self.model
 
     def _load_data(self, dataset_path: str):
-        data = torch.load(dataset_path)
-        self.db_embeddings = data['embeddings'].numpy().astype("float32")
+        data = _torch_load(dataset_path, map_location="cpu")
+        emb = data['embeddings']
+        emb = emb.numpy() if isinstance(emb, torch.Tensor) else np.asarray(emb)
+        self.db_embeddings = np.ascontiguousarray(emb, dtype=np.float32)
         self.db_labels = np.array(data['labels'])
         self.image_ids = data['image_id']
         self.annotation_ids = data['annotation_id']
         self.drawn_fish_ids = data['drawn_fish_id']
         self.keys = data['labels_keys']
-        self.label_to_species_id = {
-            v['label']: v['species_id'] for v in self.keys.values()
-        }
+        self.label_to_species_id = {v['label']: v['species_id'] for v in self.keys.values()}
         logger.info(f"Dataset loaded from {dataset_path}")
 
-    def __call__(self, img: Union[np.ndarray, List[np.ndarray]]):
-        if isinstance(img, np.ndarray):
+    def __call__(self, img: Union[ImageInput, List[ImageInput]]):
+        if isinstance(img, (np.ndarray, Image.Image)):
             return self.inference_numpy(img)
-        elif isinstance(img, list) and all(isinstance(i, np.ndarray) for i in img):
+        if isinstance(img, list) and all(isinstance(i, (np.ndarray, Image.Image)) for i in img):
             return self.inference_numpy_batch(img)
-        else:
-            raise TypeError("Input must be np.ndarray or List[np.ndarray].")
+        raise TypeError("Input must be np.ndarray, PIL.Image, or a list of them.")
 
-    def inference_numpy(self, img: np.ndarray):
-        tensor = self.transform(Image.fromarray(img)).unsqueeze(0).to(self.device)
-        return self._inference_batch_tensor(tensor)[0]
+    def _to_tensor(self, img: ImageInput) -> torch.Tensor:
+        if isinstance(img, np.ndarray):
+            img = Image.fromarray(img)
+        return self.transform(img.convert("RGB"))
 
-    def inference_numpy_batch(self, imgs: List[np.ndarray]):
-        tensors = torch.stack([self.transform(Image.fromarray(img)) for img in imgs]).to(self.device)
-        return self._inference_batch_tensor(tensors)
+    def inference_numpy(self, img: ImageInput):
+        return self._inference_batch_tensor(self._to_tensor(img).unsqueeze(0).to(self.device))[0]
+
+    def inference_numpy_batch(self, imgs: List[ImageInput]):
+        return self._inference_batch_tensor(torch.stack([self._to_tensor(i) for i in imgs]).to(self.device))
 
     def _inference_batch_tensor(self, tensors: torch.Tensor):
-        with use_ema_params(self.model, self.ema):
-            with torch.no_grad():
-                embeddings, archead_logits, fc_logits = self.model(tensors)
+        with torch.inference_mode():
+            embeddings, archead_logits, fc_logits = self.model(tensors)
 
-        archead_indices = torch.argmax(archead_logits, dim=1)
-        fc_indices = torch.argmax(fc_logits, dim=1)
+        archead_indices = torch.argmax(archead_logits, dim=1).tolist()
+        fc_indices = torch.argmax(fc_logits, dim=1).tolist()
 
         output = self.get_top_neighbors_from_embeddings(embeddings)
         logger.debug(f"Inference output: {output}")
 
-        for i, (item, arc_idx, fc_idx) in enumerate(zip(output, archead_indices, fc_indices)):
-            arc_label = self.id_to_label[arc_idx.item()]
-            fc_label = self.id_to_label[fc_idx.item()]
-
+        for item, arc_idx, fc_idx in zip(output, archead_indices, fc_indices):
+            arc_label = self.id_to_label[arc_idx]
+            fc_label = self.id_to_label[fc_idx]
             if arc_label not in item:
                 item[arc_label] = {'index': None, 'similarity': 0.05, 'times': 1}
-
             if fc_label not in item:
                 item[fc_label] = {'index': None, 'similarity': 0.01, 'times': 1}
 
         return self._postprocess(output)
 
-    def _postprocess(self, class_results) -> List[PredictionResult]:
+    def _postprocess(self, class_results) -> List[List[PredictionResult]]:
         results = []
         for single_fish in class_results:
             fish_results = []
             for label, data in single_fish.items():
                 index = data["index"]
+                has_idx = index is not None
                 fish_results.append(PredictionResult(
                     name=label,
                     species_id=self.label_to_species_id[label],
-                    distance=data['similarity'],
-                    accuracy=data['similarity'] / data['times'],
-                    image_id=self.image_ids[index] if index is not None else None,
-                    annotation_id=self.annotation_ids[index] if index is not None else None,
-                    drawn_fish_id=self.drawn_fish_ids[index] if index is not None else None,
+                    distance=float(data['similarity']),
+                    accuracy=float(data['similarity'] / data['times']),
+                    image_id=self.image_ids[index] if has_idx else None,
+                    annotation_id=self.annotation_ids[index] if has_idx else None,
+                    drawn_fish_id=self.drawn_fish_ids[index] if has_idx else None,
                 ))
             results.append(fish_results)
         return results
 
     def _prepare_centroids(self):
-        unique_labels = np.unique(self.db_labels)
-        self.label_to_centroid = {}
-        for label in unique_labels:
-            class_embs = self.db_embeddings[self.db_labels == label]
-            centroid = np.mean(class_embs, axis=0)
-            centroid /= (np.linalg.norm(centroid) + 1e-10)
-            self.label_to_centroid[label] = centroid
+        # One pass over the database instead of one boolean mask per class.
+        unique_labels, inverse = np.unique(self.db_labels, return_inverse=True)
+        sums = np.zeros((len(unique_labels), self.dim), dtype=np.float64)
+        np.add.at(sums, inverse, self.db_embeddings)
+        centroids = sums / np.bincount(inverse)[:, None]
+        centroids /= np.linalg.norm(centroids, axis=1, keepdims=True) + 1e-10
 
-        self.centroid_matrix = np.stack([self.label_to_centroid[label] for label in self.label_to_centroid])
-        self.centroid_labels = list(self.label_to_centroid.keys())
+        self.centroid_matrix = centroids.astype(np.float32)
+        self.centroid_labels = list(unique_labels)
+        self.label_to_centroid = dict(zip(self.centroid_labels, self.centroid_matrix))
+
+        # Precomputed member indices per class (sorted, matching database order),
+        # so a query gathers candidates without scanning every label.
+        order = np.argsort(inverse, kind="stable")
+        bounds = np.cumsum(np.bincount(inverse))[:-1]
+        self.label_to_indices = dict(zip(self.centroid_labels, np.split(order, bounds)))
 
     def get_top_neighbors_from_embeddings(
         self,
@@ -180,58 +183,56 @@ class EmbeddingClassifier:
         neighbor_threshold: float = 0.8
     ) -> List[Dict[str, Dict[str, Union[float, int, None]]]]:
         start_time = time.time()
-        logger.info(f"Starting search over {len(query_embeddings)} embeddings")
-
         if isinstance(query_embeddings, torch.Tensor):
-            query_embeddings = query_embeddings.cpu().numpy().astype("float32")
+            query_embeddings = query_embeddings.detach().cpu().numpy()
+        queries = np.ascontiguousarray(query_embeddings, dtype=np.float32)
+        queries = queries / (np.linalg.norm(queries, axis=1, keepdims=True) + 1e-10)
+
+        # Cosine similarity to every centroid for the whole batch in one matmul.
+        all_centroid_sims = queries @ self.centroid_matrix.T
 
         results = []
-        for query_emb in query_embeddings:
-            centroid_sims = 1.0 - pairwise_distances(query_emb.reshape(1, -1), self.centroid_matrix, metric='cosine')[0]
-            top_centroid_indices = np.argsort(-centroid_sims)[:topk_centroid]
-
+        for query_emb, centroid_sims in zip(queries, all_centroid_sims):
+            k = min(topk_centroid, len(centroid_sims))
+            top_idx = np.argpartition(-centroid_sims, k - 1)[:k]
+            top_idx = top_idx[np.argsort(-centroid_sims[top_idx])]
             centroid_scores = {
-                self.centroid_labels[idx]: centroid_sims[idx]
-                for idx in top_centroid_indices if centroid_sims[idx] >= centroid_threshold
+                self.centroid_labels[i]: float(centroid_sims[i])
+                for i in top_idx if centroid_sims[i] >= centroid_threshold
             }
-            selected_classes = set(centroid_scores.keys())
-
-            if not selected_classes:
+            if not centroid_scores:
                 results.append({})
                 continue
 
-            class_mask = np.isin(self.db_labels, list(selected_classes))
-            selected_embeddings = self.db_embeddings[class_mask]
-            selected_labels = self.db_labels[class_mask]
-            selected_indices = np.where(class_mask)[0]
-
-            if len(selected_embeddings) == 0:
-                results.append({"top_neighbors": [], "centroid_scores": centroid_scores})
-                continue
-
-            faiss_index = faiss.IndexFlatIP(self.dim)
-            faiss_index.add(selected_embeddings)
-            distances, indices = faiss_index.search(query_emb.reshape(1, -1), min(topk_neighbors, len(selected_embeddings)))
+            # Exact inner-product search over members of the shortlisted classes.
+            # Sorted indices keep tie-breaking identical to a scan in database order.
+            cand = np.sort(np.concatenate([self.label_to_indices[lbl] for lbl in centroid_scores]))
+            sims = self.db_embeddings[cand] @ query_emb
+            n = min(topk_neighbors, len(sims))
+            top = np.argpartition(-sims, n - 1)[:n]
+            top = top[np.lexsort((top, -sims[top]))]
 
             score_map = defaultdict(lambda: {'index': None, 'similarity': 0.0, 'times': 0})
-            for rank, idx in enumerate(indices[0]):
-                label = selected_labels[idx]
-                sim = distances[0][rank]
-                original_idx = selected_indices[idx]
-                if sim >= neighbor_threshold:
-                    score_map[label]['similarity'] += sim
-                    score_map[label]['times'] += 1
-                    if score_map[label]['index'] is None:
-                        score_map[label]['index'] = original_idx
+            for j in top:
+                sim = float(sims[j])
+                if sim < neighbor_threshold:
+                    break  # sorted descending: nothing further qualifies
+                original_idx = int(cand[j])
+                entry = score_map[self.db_labels[original_idx]]
+                entry['similarity'] += sim
+                entry['times'] += 1
+                if entry['index'] is None:
+                    entry['index'] = original_idx
 
-            for label, sim in centroid_scores.items():
+            for label in centroid_scores:
                 if label not in score_map:
                     score_map[label] = {'index': None, 'similarity': 0.1, 'times': 1}
 
-            results.append(score_map)
+            results.append(dict(score_map))
 
-        logger.info(f"Completed in {time.time() - start_time:.2f} seconds")
+        logger.debug(f"Searched {len(queries)} embeddings in {time.time() - start_time:.3f}s")
         return results
+
 
 class AttentionPooling(nn.Module):
     def __init__(self, in_channels):
@@ -268,7 +269,8 @@ class ArcFaceHead(nn.Module):
 class StableEmbeddingModel(nn.Module):
     def __init__(self, embedding_dim=256, num_classes=639, pretrained=True, freeze_backbone=True):
         super().__init__()
-        self.backbone = convnext_tiny(pretrained=pretrained)
+        # `pretrained=` is deprecated in torchvision; use the weights enum.
+        self.backbone = convnext_tiny(weights=ConvNeXt_Tiny_Weights.IMAGENET1K_V1 if pretrained else None)
 
         if freeze_backbone:
             for param in self.backbone.parameters():
@@ -289,17 +291,11 @@ class StableEmbeddingModel(nn.Module):
         pooled = self.pooling(x)                 # (B, 768)
 
         fc_logits = self.fc_parallel(pooled)
-        emb = self.embeddings(pooled)
-        emb_norm = F.normalize(emb, p=2, dim=1)
-
-        if labels is not None:
-            arc_logits = self.arcface(emb_norm, labels)
-        else:
-            arc_logits = self.arcface(emb_norm)
+        emb_norm = F.normalize(self.embeddings(pooled), p=2, dim=1)
+        arc_logits = self.arcface(emb_norm, labels)
 
         if not self.training:
             arc_logits = F.softmax(arc_logits, dim=1)
             fc_logits = F.softmax(fc_logits, dim=1)
 
         return emb_norm, arc_logits, fc_logits
-

@@ -8,8 +8,8 @@ import torch.nn.functional as F
 from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 from typing import Optional
 
-import timm
-from timm.models.vision_transformer import VisionTransformer  # For type hinting
+# timm is only needed for the ViT variant; imported lazily so the ConvNeXt
+# model works without it installed.
 
 
 class ViTAttentionPooling(nn.Module):
@@ -189,7 +189,7 @@ class StableEmbeddingModelViT(nn.Module):
                  pretrained_backbone=True,
                  freeze_backbone_initially=False,
                  backbone_model_name='beitv2_base_patch16_224.in1k_ft_in22k_in1k',  # A popular ViT model
-                 custom_backbone: Optional[VisionTransformer] = None,  # For passing a custom backbone
+                 custom_backbone: Optional[nn.Module] = None,  # For passing a custom backbone
                  attention_hidden_channels=None,  # For ViT pooling, this is `hidden_features`
                  arcface_s=64.0,
                  arcface_m=0.5,
@@ -204,8 +204,9 @@ class StableEmbeddingModelViT(nn.Module):
             self.backbone_out_features = self.backbone.embed_dim
             print("Using custom ViT backbone.")
         else:
+            import timm
             print(f"Loading ViT backbone: {backbone_model_name}")
-            self.backbone: VisionTransformer = timm.create_model(
+            self.backbone = timm.create_model(
                 backbone_model_name,
                 pretrained=pretrained_backbone,
                 num_classes=0  # Important: disable the classification head
@@ -349,7 +350,7 @@ class StableEmbeddingModel(nn.Module):
             embedding_layers.append(nn.BatchNorm1d(embedding_dim))
         # An activation can be added if necessary, e.g.:
         # embedding_layers.append(nn.ReLU(inplace=True))
-        if embedding_dropout_rate > 0.1:
+        if embedding_dropout_rate > 0.0:
             embedding_layers.append(nn.Dropout(embedding_dropout_rate))
 
         self.embedding_fc = nn.Sequential(*embedding_layers)
@@ -367,8 +368,8 @@ class StableEmbeddingModel(nn.Module):
             first_conv_layer = None
             if hasattr(self.backbone, 'features') and isinstance(self.backbone.features, nn.Sequential) and len(
                     self.backbone.features) > 0:
-                if isinstance(self.backbone.features[0], nn.ModuleList) and len(
-                        self.backbone.features[0]) > 0:  # ConvNeXt structure
+                if isinstance(self.backbone.features[0], nn.Sequential) and len(
+                        self.backbone.features[0]) > 0:  # ConvNeXt stem: Sequential(Conv2d, LayerNorm2d)
                     first_conv_layer = self.backbone.features[0][0]
                 elif isinstance(self.backbone.features[0], nn.Conv2d):  # Other common structures
                     first_conv_layer = self.backbone.features[0]
@@ -419,7 +420,9 @@ class StableEmbeddingModel(nn.Module):
 
     def forward(self, x, labels=None, object_mask=None, return_softmax=False, return_attention_map=True):
         features = self.backbone_feature_extractor(x)
-        pooled, attn_map = self.pooling(features, object_mask=object_mask, return_attention_map=return_attention_map)
+        # Always request the map: with return_attention_map=False the pooling returns a
+        # single tensor and the tuple unpack would raise.
+        pooled, attn_map = self.pooling(features, object_mask=object_mask, return_attention_map=True)
         emb_raw = self.embedding_fc(pooled)
         emb_norm = F.normalize(emb_raw, p=2, dim=1)
         logits = self.arcface_head(emb_norm, labels)
